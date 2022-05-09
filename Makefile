@@ -25,7 +25,7 @@ $(LIBFT):
 			$(MAKE) -C $(@D) $(@F)
 
 $(NAME):	$(LIBFT) $(OBJS) 
-			$(CC) $(OBJS) $(LFLAGS) $(OUTPUT_OPTION)
+			$(CC) $(OBJS) $(LFLAGS) $(OUTPUT_OPTION) 
 
 clean:
 			$(RM) $(OBJS)

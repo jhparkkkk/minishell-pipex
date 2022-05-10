@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 #include "libft.h"
 
+#define FORK_ERROR 1
 
 typedef struct s_cmd 
 {
@@ -12,6 +13,6 @@ typedef struct s_cmd
     char **path;
     //char *cmd_path[2];
     int  nb_process;
-}   t_cmd;
+}       t_cmd;
 
 #endif

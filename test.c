@@ -59,78 +59,63 @@ char	*get_cmd_path(t_cmd *cmd, char *cmd_path)
 
 }
 
-/* je verifie le statut de tous mes processus */ 
-int	get_processus_status(t_cmd *cmd, pid_t pid[], int *curr_process)
+void	execute_builtin(char *cmd_path, char **envp)
 {
-	pid_t		res = 0;
-	int			status = 0;
-	if (*curr_process == cmd->nb_process)
+	char	*options[3] = {"ls", "-la", NULL};
+
+	if (execve(cmd_path, options, envp) == 0)
+	 	printf("EXECVE SUCCES !\n");
+}
+
+int	create_pipes(t_cmd *cmd, char *cmd_path, char **envp)
+{
+	(void)cmd;
+	(void)cmd_path;
+	(void)envp;
+
+	int end[2];
+	pid_t pid;
+	int reader;
+	char buf[10];
+
+
+	if (pipe(end) < 0)
+		return (1);
+	//je cree processus fils
+	pid = fork();
+	if (pid == -1)
+		return (1);
+	else if (pid == 0)
 	{
-		printf("DONE\n");
+		// je suis dans le processus fils
+		close(end[0]); // l'enfant ne va rien lire alors je ferme le bout lecture
+		write(end[1], "coucou\n", 7);
+		close(end[1]); // l'enfant a fini d'ecrire alors je ferme le bout ecriture 
+		return (0);
 	}
-	res = waitpid(pid[*curr_process], &status, 0);
-	if (WIFEXITED(status))
-		printf("MY 1st CHILD ENDED HIS PROCESS CORRECTLY\n");
 	else
-		printf("MY 1st CHILD GOT INTERRUPTED...\n");
-	if (*curr_process < cmd->nb_process)
 	{
-		*curr_process = *curr_process + 1;
-		get_processus_status(cmd, pid, curr_process);
+		// je suis dans le processus parent
+		close(end[1]); // le parent ne va rien ecrire alors je ferme le bout lecture
+		waitpid(pid, NULL, 0); // le parent attend son fils
+		reader = read(end[0], buf, 10);
+		if (reader < 0)
+			return (3);
+		close(end[0]); // le parent a fini de lire alors je ferme le bout lecture
+		buf[reader] = '\0';
+		printf("%s\n", buf);
 	}
 	return (0);
 }
 
 
-
-/* Je cree mes processus enfant a l'aide de fork() en fonction du nb de
-commandes invoquees */
-
-int	create_processus(t_cmd *cmd, int *curr_process)
-{
-	pid_t		pid[cmd->nb_process];
-	int			pipe_fd[2];
-
-	/* je ne sais pas si c'est utile
-	if (pid[*curr_process] == 0 && *curr_process == cmd->nb_process)
-	{
-		*curr_process = 0;
-		//get_processus_status(cmd, &pid[cmd->nb_process], curr_process);
-	}*/
-	// si je me trouve dans le processus child, je peux effectuer mes redirections
-	// de l'entree et de la sortie si celui ci a un frere 
-	if (pid[*curr_process] == 0)
-	{
-		//fonction de redirection a faire 
-		//close(pipe_fd[0]);
-		dup2(pipe_fd[1], STDOUT_FILENO);
-		dup2(pipe_fd[0], STDIN_FILENO);
-	}
-	// je genere un processus child avec l'appel fork
-	pid[*curr_process] = fork();
-
-	//je verifie si la naissance s'est bien deroulee 
-	if (pid[*curr_process] < 1)
-		return (perror("Fork: "));
-
-	// je suis dans le processus parent et je verifie si j'ai d'autres processus child a generer 
-	else if (pid[*curr_process] > 0 && *curr_process < cmd->nb_process - 1) 
-	{
-		*curr_process = *curr_process + 1;
-		create_processus(cmd, curr_process);
-	}
-	return (0);
-
-
-}
 int main(int ac, char **av, char **envp)
 {
-	char *options[3] = {"ls", "-la", NULL};
     t_cmd	cmd;
 	char	*cmd_path;
-	int fork_res;
-	int curr_process = 0;
-	cmd.nb_process = 2;
+
+	cmd.nb_builtin = 3;
+	
 	if (ac > 1)
 	{
 		cmd.commande = av[1];
@@ -139,10 +124,9 @@ int main(int ac, char **av, char **envp)
 	locate_path(&cmd, envp);
 	cmd_path = get_cmd_path(&cmd, cmd_path);
 	printf("PATH FOR LS IS : %s\n", cmd_path);
-	if (cmd.nb_process > 0)
-		fork_res = create_processus(&cmd, &curr_process);
+	printf("%d\n", create_pipes(&cmd, cmd_path, envp));
+	// if (cmd.nb_builtin == 1)
+	// 	execute_builtin(cmd_path, envp);
 
-    if (execve(cmd_path, options, envp) == 0)
-	 	printf("EXECVE SUCCES !\n");
     return (0);
 }

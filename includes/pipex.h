@@ -9,10 +9,10 @@
 
 typedef struct s_cmd 
 {
-    char *commande;
-    char **path;
-    //char *cmd_path[2];
-    int  nb_process;
+    char    *commande;
+    char    **path;
+    int     *fd;
+    int     nb_builtin;   
 }       t_cmd;
 
 #endif

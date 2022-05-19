@@ -1,5 +1,23 @@
 #include "pipex.h"
 
+void	_print_pipes_tab(t_cmd *cmd)
+{
+	int i = 0;
+	int j = 0;
+
+	while( i < NB_BUILTIN - 1)
+	{
+		j = 0;
+		while(j < 2)
+		{
+			printf("PIPE no. %d = %d ", i, cmd->pipes[i][j]);
+			j++;
+		}
+		i++;
+		printf("\n");
+	}
+}
+
 
 /* Je liste tous les chemins possibles avec split en ajoutant
 "/" a la fin de chaque chemin. */
@@ -50,7 +68,7 @@ int	get_cmd_path(t_cmd *cmd)
 
 	while (cmd->path_from_envp[i])
 	{
-		cmd->path = ft_strjoin(cmd->path_from_envp[i], cmd->commande);
+		cmd->path = ft_strjoin(cmd->path_from_envp[i], cmd->builtin_1);
 		if (access(cmd->path, F_OK | X_OK) == 0)
 			return(0);
 		i++;
@@ -61,13 +79,13 @@ int	get_cmd_path(t_cmd *cmd)
 
 void	execute_builtin(t_cmd *cmd, char **envp)
 {
-	char	*options[3] = {"ls", "-la", NULL};
+	char	*options[3] = {"ls", "-1", NULL}; // il faudra se referer au tab parsing 
 
 	if (execve(cmd->path, options, envp) == 0)
 	 	printf("EXECVE SUCCES !\n");
 }
 
-int	create_pipes(t_cmd *cmd, char **envp)
+int	exec_one_builtin(t_cmd *cmd, char **envp)
 {
 	(void)cmd;
 	(void)envp;
@@ -119,6 +137,19 @@ int **destroy_pipes(int **pipes)
 	return (NULL);
 }
 
+void	do_redirection(t_cmd *cmd)
+{
+	int i = 0;
+	while(i < NB_BUILTIN - 1)
+	{
+		if (i != 0)
+			dup2(cmd->pipes[i][0], STDIN_FILENO);
+		if (i != NB_BUILTIN -1)
+			dup2(cmd->pipes[i][1], STDOUT_FILENO);
+		i++;
+	}
+}
+
 int	init_pipes(t_cmd *cmd)
 {
 	int i;
@@ -141,39 +172,56 @@ int	init_pipes(t_cmd *cmd)
 	return(0);
 }
 
+int	create_child(t_cmd *cmd, char **envp)
+{
+	pid_t child[NB_BUILTIN];
+	int i = 0;
+	int status; 
+	while (i < NB_BUILTIN)
+	{
+		child[i] = fork();
+		if (child[i] == -1)
+			return (FORK_ERROR);
+		if (child[i] == 0)
+		{
+			printf("Je suis le fils no. %d", i);
+			execute_builtin(cmd, envp);
+			//je suis le 1er fils
+		}
+		else if (child[i] > 0)
+		{
+			// je suis le pere
+			close(cmd->pipes[i][0]); // le parent ne va rien ecrire alors je ferme le bout lecture
+			waitpid(child[i], &status, 0); // le parent attend son fils
+			if (WIFEXITED(status))
+            	printf("Pere : Il a termine normalement, code sortie %d\n", WEXITSTATUS(status));
+        	else
+            	printf("Pere : Il a ete interrompu...\n");
+		}
+		i++;
+	}
+	return (0);
+}
+
 
 int main(int ac, char **av, char **envp)
 {
     t_cmd	cmd;
-	int		**pipes;
 	cmd.nb_builtin = 3;
 	
 	if (ac > 1)
 	{
-		cmd.commande = av[1];
+		cmd.builtin_1 = av[1];
 	}
-	pipes = NULL;
 	cmd.path = NULL;
 	locate_path(&cmd, envp);
 	get_cmd_path(&cmd);
 	printf("PATH FOR %s IS : %s\n", av[1], cmd.path);
 	if (init_pipes(&cmd) == PIPE_ERROR)
 		return (write(2, "pipe error\n", 11), 0);
-	//printf("%d\n", create_pipes(&cmd, envp));
-	// if (cmd.nb_builtin == 1)
-	// 	execute_builtin(cmd_path, envp);
-	int i = 0;
-	int j = 0;
-	while( i < NB_BUILTIN - 1)
-	{
-		j = 0;
-		while(j < 2)
-		{
-			printf("PIPE no. %d = %d ", i, cmd.pipes[i][j]);
-			j++;
-		}
-		i++;
-		printf("\n");
-	}
+	do_redirection(&cmd);
+	//exec_one_builtin(&cmd, envp);
+	//if (create_child(&cmd) == FORK_ERROR)
+	//	return (write(2, "fork error\n", 11), 0);
     return (0);
 }

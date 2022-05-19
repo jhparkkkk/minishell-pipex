@@ -3,6 +3,8 @@
 #include <unistd.h>
 // wait waitpid
 #include <sys/wait.h>
+// stdin out err
+#include <stdio.h>
 #include "libft.h"
 
 #define FORK_ERROR 1
@@ -10,7 +12,7 @@
 #define NB_BUILTIN 3
 typedef struct s_cmd 
 {
-    char    *commande;
+    char    *builtin_1;
     char    **path_from_envp;
     char    *path;
     int     *fd;
